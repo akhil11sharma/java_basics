@@ -1,0 +1,132 @@
+//ek table mai edit kr rha h acche se and refelct bhi hora h 
+import mysql.connector
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': 'Root@123',
+    'database': 'emprec'
+}
+
+def execute_query(query, params=None, fetch=False):
+    try:
+        mydb = mysql.connector.connect(**DB_CONFIG)
+        cursor = mydb.cursor()
+        if params:
+            cursor.callproc(query, params)
+        else:
+            cursor.callproc(query)
+        if fetch:
+            results = []
+            for result in cursor.stored_results():
+                results.extend(result.fetchall())
+            return results
+        mydb.commit()
+    except mysql.connector.Error as err:
+        print(f"MySQL Error: {err}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'mydb' in locals() and mydb.is_connected():
+            mydb.close()
+
+def add_student():
+    student_id = entry_id.get()
+    student_name = entry_name.get()
+    marks = entry_marks.get()
+    class_ = entry_class.get()
+    sec = entry_sec.get()
+    if student_id and student_name and marks and class_ and sec:
+        execute_query('AddStudent', (student_id, student_name, marks, class_, sec))
+        refresh_table()
+    else:
+        messagebox.showwarning("Input Error", "All fields are required")
+
+def update_student():
+    student_id = entry_id.get()
+    student_name = entry_name.get()
+    marks = entry_marks.get()
+    class_ = entry_class.get()
+    sec = entry_sec.get()
+    if student_id:
+        execute_query('UpdateStudent', (student_id, student_name, marks, class_, sec))
+        refresh_table()
+    else:
+        messagebox.showwarning("Input Error", "Student ID is required")
+
+def delete_student():
+    student_id = entry_id.get()
+    if student_id:
+        execute_query('DeleteStudent', (student_id,))
+        refresh_table()
+    else:
+        messagebox.showwarning("Input Error", "Student ID is required")
+
+def refresh_table():
+    try:
+        for i in tree.get_children():
+            tree.delete(i)
+    except tk.TclError:
+        pass 
+        
+    students = execute_query('GetStudents', fetch=True)
+    if students:
+        for student in students:
+            tree.insert("", "end", values=student)
+
+def main():
+    root = tk.Tk()
+    root.title("Student Management")
+
+    frame = tk.Frame(root)
+    frame.pack(pady=20)
+
+    tk.Label(frame, text="Student ID").grid(row=0, column=0, padx=10, pady=5)
+    tk.Label(frame, text="Student Name").grid(row=0, column=1, padx=10, pady=5)
+    tk.Label(frame, text="Marks").grid(row=0, column=2, padx=10, pady=5)
+    tk.Label(frame, text="Class").grid(row=0, column=3, padx=10, pady=5)
+    tk.Label(frame, text="Sec").grid(row=0, column=4, padx=10, pady=5)
+
+    global entry_id, entry_name, entry_marks, entry_class, entry_sec
+    entry_id = tk.Entry(frame)
+    entry_id.grid(row=1, column=0, padx=10, pady=5)
+    entry_name = tk.Entry(frame)
+    entry_name.grid(row=1, column=1, padx=10, pady=5)
+    entry_marks = tk.Entry(frame)
+    entry_marks.grid(row=1, column=2, padx=10, pady=5)
+    entry_class = tk.Entry(frame)
+    entry_class.grid(row=1, column=3, padx=10, pady=5)
+    entry_sec = tk.Entry(frame)
+    entry_sec.grid(row=1, column=4, padx=10, pady=5)
+
+    add_button = tk.Button(frame, text="Add Student", command=add_student)
+    add_button.grid(row=2, column=0, padx=10, pady=5)
+    update_button = tk.Button(frame, text="Update Student", command=update_student)
+    update_button.grid(row=2, column=1, padx=10, pady=5)
+    delete_button = tk.Button(frame, text="Delete Student", command=delete_student)
+    delete_button.grid(row=2, column=2, padx=10, pady=5)
+
+    global tree
+    tree_frame = tk.Frame(root)
+    tree_frame.pack(padx=20, pady=10)
+    tree_scroll = ttk.Scrollbar(tree_frame)
+    tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+    tree = ttk.Treeview(tree_frame, columns=("ID", "NAME", "MARKS", "Class", "Sec"), show="headings", height=10, yscrollcommand=tree_scroll.set)
+    tree.pack()
+
+    tree.heading("ID", text="ID")
+    tree.heading("NAME", text="NAME")
+    tree.heading("MARKS", text="MARKS")
+    tree.heading("Class", text="Class")
+    tree.heading("Sec", text="Sec")
+
+    tree_scroll.config(command=tree.yview)
+    refresh_table()
+
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()

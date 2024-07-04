@@ -1,0 +1,334 @@
+import mysql.connector
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+# Database configuration
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': 'Root@123',
+    'database': 'emprec'
+}
+
+def execute_query(query, params=None, fetch=False):
+    try:
+        mydb = mysql.connector.connect(**DB_CONFIG)
+        cursor = mydb.cursor()
+        
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        
+        if fetch:
+            results = cursor.fetchall()
+            return results
+        
+        mydb.commit()
+    except mysql.connector.Error as err:
+        print(f"MySQL Error: {err}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'mydb' in locals() and mydb.is_connected():
+            mydb.close()
+
+def fetch_tables():
+    try:
+        mydb = mysql.connector.connect(**DB_CONFIG)
+        cursor = mydb.cursor()
+        
+        cursor.execute("SHOW TABLES")
+        tables = [table[0] for table in cursor.fetchall()]
+        
+        return tables
+    except mysql.connector.Error as err:
+        print(f"MySQL Error: {err}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'mydb' in locals() and mydb.is_connected():
+            mydb.close()
+
+def fetch_table_columns(table_name):
+    try:
+        mydb = mysql.connector.connect(**DB_CONFIG)
+        cursor = mydb.cursor()
+        
+        cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+        columns = [column[0] for column in cursor.fetchall()]
+        
+        return columns
+    except mysql.connector.Error as err:
+        print(f"MySQL Error: {err}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'mydb' in locals() and mydb.is_connected():
+            mydb.close()
+
+def fetch_table_data(table_name):
+    try:
+        mydb = mysql.connector.connect(**DB_CONFIG)
+        cursor = mydb.cursor()
+        
+        cursor.execute(f"SELECT * FROM `{table_name}`")
+        data = cursor.fetchall()
+        
+        return data
+    except mysql.connector.Error as err:
+        print(f"MySQL Error: {err}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'mydb' in locals() and mydb.is_connected():
+            mydb.close()
+
+def save_changes(table_name, data):
+    try:
+        mydb = mysql.connector.connect(**DB_CONFIG)
+        cursor = mydb.cursor()
+        
+        cursor.execute(f"DELETE FROM `{table_name}`")
+        
+        for row in data:
+            placeholders = ', '.join(['%s'] * len(row))
+            insert_query = f"INSERT INTO `{table_name}` VALUES ({placeholders})"
+            cursor.execute(insert_query, row)
+        
+        mydb.commit()
+        messagebox.showinfo("Success", "Changes saved successfully!")
+        
+    except mysql.connector.Error as err:
+        print(f"MySQL Error: {err}")
+        messagebox.showerror("Error", f"Failed to save changes: {err}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'mydb' in locals() and mydb.is_connected():
+            mydb.close()
+
+def load_table_data(table_name):
+    columns = fetch_table_columns(table_name)
+    data = fetch_table_data(table_name)
+    return columns, data
+
+def insert_row(table_name, values):
+    try:
+        mydb = mysql.connector.connect(**DB_CONFIG)
+        cursor = mydb.cursor()
+        
+        placeholders = ', '.join(['%s'] * len(values))
+        insert_query = f"INSERT INTO `{table_name}` VALUES ({placeholders})"
+        cursor.execute(insert_query, values)
+        
+        mydb.commit()
+        messagebox.showinfo("Success", "Row inserted successfully!")
+        
+    except mysql.connector.Error as err:
+        print(f"MySQL Error: {err}")
+        messagebox.showerror("Error", f"Failed to insert row: {err}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'mydb' in locals() and mydb.is_connected():
+            mydb.close()
+
+def update_row(table_name, row_id, values):
+    try:
+        mydb = mysql.connector.connect(**DB_CONFIG)
+        cursor = mydb.cursor()
+        
+        update_query = f"UPDATE `{table_name}` SET "
+        update_query += ', '.join([f"{col} = %s" for col in values.keys()])
+        update_query += f" WHERE RowID = {row_id}"  # Replace RowID with your primary key column name
+        
+        cursor.execute(update_query, tuple(values.values()))
+        
+        mydb.commit()
+        messagebox.showinfo("Success", "Row updated successfully!")
+        
+    except mysql.connector.Error as err:
+        print(f"MySQL Error: {err}")
+        messagebox.showerror("Error", f"Failed to update row: {err}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'mydb' in locals() and mydb.is_connected():
+            mydb.close()
+
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
+
+        self.title("MySQL Table Viewer and Editor")
+        self.geometry("800x600")
+
+        self.control_frame = ttk.Frame(self)
+        self.control_frame.pack(pady=10)
+
+        self.selected_table = tk.StringVar()
+        self.table_combobox = ttk.Combobox(self.control_frame, textvariable=self.selected_table, state="readonly")
+        self.table_combobox.grid(row=0, column=0, padx=10, pady=5)
+
+        self.load_tables_button = ttk.Button(self.control_frame, text="Load Tables", command=self.load_tables)
+        self.load_tables_button.grid(row=0, column=1, padx=10, pady=5)
+
+        self.add_button = ttk.Button(self.control_frame, text="Add Row", command=self.insert_row_handler)
+        self.add_button.grid(row=0, column=2, padx=10, pady=5)
+
+        self.update_button = ttk.Button(self.control_frame, text="Update Row", command=self.update_row_handler)
+        self.update_button.grid(row=0, column=3, padx=10, pady=5)
+
+        self.delete_button = ttk.Button(self.control_frame, text="Delete Row", command=self.delete_row_handler)
+        self.delete_button.grid(row=0, column=4, padx=10, pady=5)
+
+        self.data_frame = ttk.Frame(self)
+        self.data_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        self.columns_treeview = ttk.Treeview(self.data_frame)
+        self.columns_treeview.pack(fill="both", expand=True)
+
+        self.load_tables()
+
+    def load_tables(self):
+        tables = fetch_tables()
+        self.table_combobox['values'] = tables
+        if tables:
+            self.selected_table.set(tables[0])  # Select the first table by default
+            self.load_table_data()
+
+    def load_table_data(self):
+        table_name = self.selected_table.get()
+        if table_name:
+            columns, data = load_table_data(table_name)
+            self.display_table(columns, data)
+
+    def display_table(self, columns, data):
+        for child in self.columns_treeview.get_children():
+            self.columns_treeview.delete(child)
+
+        self.columns_treeview['columns'] = columns
+        self.columns_treeview.heading("#0", text="Row ID")
+        for col in columns:
+            self.columns_treeview.heading(col, text=col)
+
+        for idx, row in enumerate(data, start=1):
+            self.columns_treeview.insert("", "end", iid=idx, text=f"Row {idx}", values=row)
+
+        for col in columns:
+            self.columns_treeview.column(col, width=100)
+
+        scrollbar = ttk.Scrollbar(self.data_frame, orient="vertical", command=self.columns_treeview.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.columns_treeview.config(yscrollcommand=scrollbar.set)
+
+        self.columns_treeview.bind("<Double-1>", self.edit_row)
+
+    def edit_row(self, event):
+        selected_item = self.columns_treeview.focus()
+        if selected_item:
+            item_values = self.columns_treeview.item(selected_item, "values")
+            row_id = item_values[0]
+            original_values = item_values[1:]
+            selected_table_name = self.selected_table.get()
+            update_row_ui(selected_table_name, row_id, original_values)
+
+    def insert_row_handler(self):
+        selected_table_name = self.selected_table.get()
+        insert_row_ui(selected_table_name)
+
+    def update_row_handler(self):
+        selected_table_name = self.selected_table.get()
+        selected_item = self.columns_treeview.selection()
+        if not selected_item:
+            messagebox.showwarning("Warning", "Please select a row to update.")
+            return
+
+        item_id = int(self.columns_treeview.item(selected_item, "text").split()[1])
+        columns = fetch_table_columns(selected_table_name)
+        original_values = self.columns_treeview.item(selected_item, "values")[1:]
+        update_row_ui(selected_table_name, item_id, original_values)
+
+    def delete_row_handler(self):
+        selected_item = self.columns_treeview.focus()
+        if selected_item:
+            item_id = int(self.columns_treeview.item(selected_item, "text").split()[1])
+            selected_table_name = self.selected_table.get()
+            delete_row(selected_table_name, item_id)
+            self.load_table_data()
+
+def insert_row_ui(selected_table_name):
+    def save_new_row():
+        values = [entry_fields[col].get() for col in columns]
+        insert_row(selected_table_name, tuple(values))
+        top.destroy()
+        app.load_table_data()
+
+    columns = fetch_table_columns(selected_table_name)
+    top = tk.Toplevel()
+    top.title("Insert New Row")
+
+    entry_fields = {}
+    for i, col in enumerate(columns, 1):
+        lbl = tk.Label(top, text=f"{col}:")
+        lbl.grid(row=i, column=0, padx=5, pady=3)
+        entry = tk.Entry(top)
+        entry.grid(row=i, column=1, padx=5, pady=3)
+        entry_fields[col] = entry
+
+    save_button = tk.Button(top, text="Save", command=save_new_row)
+    save_button.grid(row=len(columns) + 1, columnspan=2, padx=5, pady=10)
+
+def update_row_ui(selected_table_name, row_id, original_values):
+    def save_updated_row():
+        new_values = {col: entry_fields[col].get() for col in columns}
+        update_row(selected_table_name, row_id, new_values)
+        top.destroy()
+        app.load_table_data()
+
+    columns = fetch_table_columns(selected_table_name)
+    top = tk.Toplevel()
+    top.title("Update Row")
+
+    entry_fields = {}
+    for i, col in enumerate(columns, 1):
+        lbl = tk.Label(top, text=f"{col}:")
+        lbl.grid(row=i, column=0, padx=5, pady=3)
+        entry = tk.Entry(top)
+        entry.grid(row=i, column=1, padx=5, pady=3)
+        entry.insert(0, original_values[col])  # Pre-fill with original data
+        entry_fields[col] = entry
+
+    save_button = tk.Button(top, text="Save", command=save_updated_row)
+    save_button.grid(row=len(columns) + 1, columnspan=2, padx=5, pady=10)
+
+def delete_row(table_name, row_id):
+    try:
+        mydb = mysql.connector.connect(**DB_CONFIG)
+        cursor = mydb.cursor()
+
+        delete_query = f"DELETE FROM `{table_name}` WHERE RowID = %s"
+        cursor.execute(delete_query, (row_id,))
+
+        mydb.commit()
+        messagebox.showinfo("Success", "Row deleted successfully!")
+
+    except mysql.connector.Error as err:
+        print(f"MySQL Error: {err}")
+        messagebox.showerror("Error", f"Failed to delete row: {err}")
+
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'mydb' in locals() and mydb.is_connected():
+            mydb.close()
+
+def main():
+    global app
+    app = App()
+    app.mainloop()
+
+if __name__ == "__main__":
+    main()
+
